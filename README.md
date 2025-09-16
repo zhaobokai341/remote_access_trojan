@@ -30,6 +30,7 @@ cd remote_access_trojan
 或直接下载然后解压
 
 2.运行
+
 进入code目录，有两个文件，分别是zh和en,zh是中文版本，en是英文版本，根据语言偏好选择合适的文件夹即可，这里以zh为例
 进入zh文件夹，输入
 ```bash
