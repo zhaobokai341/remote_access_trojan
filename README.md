@@ -14,11 +14,23 @@
 - 木马病毒可以同时控制多台设备 ✅
 - 木马病毒可以对目标主机输入命令，获取系统信息，上传/下载文件，截图，录音，实时观看对方屏幕，截取键盘输入等操作 ❌
 
-## 如何使用
-
-### 准备环境：
+## 准备环境：
 - [Python 3.10+](https://www.python.org/downloads/)
 - websockets, rich第三方库。
   ```bash
   pip3 install websockets rich
   ```
+
+## 如何使用：
+1.克隆这个仓库并进入该目录
+```bash
+git clone https://github.com/zhaobokai341/remote_access_trojan.git
+cd remote_access_trojan
+```
+或直接下载然后解压
+
+2.运行
+进入code目录，有两个文件，分别是zh和en,zh是中文版本，en是英文版本，根据语言偏好选择合适的文件夹即可，这里以zh为例
+进入zh文件夹，输入```bash
+python server.py
+```
