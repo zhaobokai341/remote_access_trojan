@@ -20,7 +20,7 @@
   ```bash
   pip3 install websockets rich
   ```
-- 要有证书，分别是key.pem和cert.pem两个文件。如果你对安全性没那么重视且想简单的生成证书，可以考虑自签名证书
+- 要有证书和密钥，分别是key.pem和cert.pem两个文件。如果你对安全性没那么重视且想简单的生成证书，可以考虑自签名证书
   ```bash
   openssl req -newkey rsa:2048 -nodes -keyout key.pem -x509 -out cert.pem -days 99999 -subj "/CN=localhost"
   ```
@@ -35,13 +35,22 @@ cd remote_access_trojan
 方法2：直接通过浏览器下载然后解压
 方法3：进入[Releases](https://github.com/zhaobokai341/remote_access_trojan/releases),选择合适的版本，下载名为code.zip的文件
 
-2.配置
+### 配置
 
 进入code目录，有两个文件，分别是zh和en,zh是中文版本，en是英文版本，根据语言偏好选择合适的文件夹即可，这里以zh为例
-进入zh文件夹， 打开server.py文件，找到这行代码
+进入zh文件夹， 打开server.py文件，找到与它类似代码
 ```python
 HOST = '0.0.0.0' 
 PORT = 8765
 SSL_CERT = '../cert.pem' 
 SSL_KEY = '../key.pem'
 ```
+首先配置HOST和PORT，HOST要连接的主机，PORT是端口，保持默认即可
+然后配置SSL_CERT和SSL_KEY，改成你生成的证书密钥路径
+
+接着打开client.py文件，找到与它类似的代码
+```python
+HOST = '127.0.0.1' 
+PORT = 8765
+```
+HOST修改成服务端IP，PORT与服务器所设计的PORT相同
