@@ -21,9 +21,9 @@
   pip3 install websockets rich
   ```
 - 要有证书，分别是key.pem和cert.pem两个文件。如果你对安全性没那么重视且想简单的生成证书，可以考虑自签名证书
-```bash
-openssl req -newkey rsa:2048 -nodes -keyout key.pem -x509 -out cert.pem -days 99999 -subj "/CN=localhost"
-```
+  ```bash
+  openssl req -newkey rsa:2048 -nodes -keyout key.pem -x509 -out cert.pem -days 99999 -subj "/CN=localhost"
+  ```
 
 ## 如何使用：
 ### 下载
