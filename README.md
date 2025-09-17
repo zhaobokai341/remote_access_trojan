@@ -36,7 +36,6 @@ cd remote_access_trojan
 方法3：进入[Releases](https://github.com/zhaobokai341/remote_access_trojan/releases),选择合适的版本，下载名为code.zip的文件
 
 ### 配置
-
 进入code目录，有两个文件，分别是zh和en,zh是中文版本，en是英文版本，根据语言偏好选择合适的文件夹即可，这里以zh为例
 进入zh文件夹， 打开server.py文件，找到与它类似代码
 ```python
@@ -53,4 +52,10 @@ SSL_KEY = '../key.pem'
 HOST = '127.0.0.1' 
 PORT = 8765
 ```
-HOST修改成服务端IP，PORT与服务器所设计的PORT相同
+HOST修改成服务端IP，PORT与服务器设置的PORT相同
+
+### 运行
+在同级目录下，打开command,输入：
+```bash
+python server.py
+```
