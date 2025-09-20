@@ -37,6 +37,7 @@ cd remote_access_trojan
 
 ### 配置
 进入code目录，有两个文件夹（zh,en），zh是中文版本，en是英文版本，选择合适的文件夹即可，这里以zh为例
+
 进入zh文件夹， 打开server.py文件，找到与它类似的代码
 ```python
 HOST = '0.0.0.0' 
@@ -45,6 +46,7 @@ SSL_CERT = '../cert.pem'
 SSL_KEY = '../key.pem'
 ```
 配置HOST和PORT，HOST要连接的主机，PORT是端口，保持默认即可
+
 配置SSL_CERT和SSL_KEY，改成你生成的证书密钥路径
 
 接着打开client.py文件，找到与它类似的代码
